@@ -1,8 +1,8 @@
 # Resume Fit Studio
 
-A browser-based resume editor. Upload a `.docx` file, adjust typography and the usable page area, fit the content to one page, and export a PDF or editable Word document.
+A browser-based resume editor. Upload a `.docx` file, adjust typography and margins, fit the content to a readable page, and export a PDF or editable Word document. When a readable one-page fit is not possible, export a multi-page PDF.
 
-The Word file is processed in the browser and is not uploaded to a server. Complex layouts, graphics, and custom Word formatting may need touch-ups after import.
+The Word file is processed in the browser and is not uploaded to a server. Complex layouts, images, and custom Word formatting may need touch-ups after import. The editable Word export may reflow, so check its page count in Word.
 
 ## GitHub Pages
 

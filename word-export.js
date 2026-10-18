@@ -9,6 +9,7 @@ function createResumeDocx(root, settings) {
   const gap = Math.round(settings.paragraphGap * 20);
   const page = settings.paperSize === 'letter' ? [215.9, 279.4] : [210, 297];
   const contentWidth = twips(page[0] - settings.left - settings.right);
+  const hyperlinks = new Map();
 
   function run(text, format = {}) {
     if (!text) return '';
@@ -23,6 +24,11 @@ function createResumeDocx(root, settings) {
       if (child.nodeType !== 1) continue;
       const tag = child.tagName.toLowerCase();
       if (tag === 'br') xml += '<w:r><w:br/></w:r>';
+      else if (tag === 'a' && /^(https?:|mailto:)/i.test(child.getAttribute('href') || '')) {
+        const href = child.getAttribute('href');
+        if (!hyperlinks.has(href)) hyperlinks.set(href, `rId${hyperlinks.size + 2}`);
+        xml += `<w:hyperlink r:id="${hyperlinks.get(href)}">${inlines(child, { ...format, underline: true })}</w:hyperlink>`;
+      }
       else if (tag !== 'img') xml += inlines(child, {
         ...format,
         bold: format.bold || tag === 'b' || tag === 'strong',
@@ -67,13 +73,13 @@ function createResumeDocx(root, settings) {
     else if (tag === 'hr') body += '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4"/></w:pBdr></w:pPr></w:p>';
     else body += paragraph(node, tag);
   }
-  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${ns}"><w:body>${body}<w:sectPr><w:pgSz w:w="${twips(page[0])}" w:h="${twips(page[1])}"/><w:pgMar w:top="${twips(settings.top)}" w:right="${twips(settings.right)}" w:bottom="${twips(settings.bottom)}" w:left="${twips(settings.left)}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="${ns}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}<w:sectPr><w:pgSz w:w="${twips(page[0])}" w:h="${twips(page[1])}"/><w:pgMar w:top="${twips(settings.top)}" w:right="${twips(settings.right)}" w:bottom="${twips(settings.bottom)}" w:left="${twips(settings.left)}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="${ns}"><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="${escape(font)}" w:hAnsi="${escape(font)}"/><w:sz w:val="${size}"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="${gap}" w:line="${line}" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style></w:styles>`;
   const files = {
     '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>',
     '_rels/.rels': '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
     'word/document.xml': documentXml,
-    'word/_rels/document.xml.rels': '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    'word/_rels/document.xml.rels': `<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${[...hyperlinks].map(([href, id]) => `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${escape(href)}" TargetMode="External"/>`).join('')}</Relationships>`,
     'word/styles.xml': stylesXml
   };
   return zipStored(files);
@@ -117,6 +123,6 @@ function zipStored(files) {
   ev.setUint32(0, 0x06054b50, true);
   ev.setUint16(8, central.length, true); ev.setUint16(10, central.length, true);
   ev.setUint32(12, centralSize, true); ev.setUint32(16, offset, true);
-  // shortcut: images and live hyperlinks are omitted; add OOXML relationships if those become part of the editor.
+  // shortcut: images and complex Word layouts are omitted; use a full DOCX renderer if those become core.
   return new Blob([...parts, ...central, end], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 }
