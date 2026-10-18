@@ -155,6 +155,24 @@ $('exportBtn').addEventListener('click', () => {
   setTimeout(() => print(), 80);
 });
 
+$('exportWordBtn').addEventListener('click', () => {
+  try {
+    const blob = createResumeDocx(editor, settings);
+    const name = currentFile.replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').trim().replace(/[. ]+$/, '') || 'Resume';
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${name}.docx`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showMessage('Word file downloaded. Check the page count in Word, which may reflow the layout.', true);
+  } catch (error) {
+    showMessage(error.message || 'The Word file could not be created.');
+  }
+});
+
 const dropZone = $('dropZone');
 dropZone.addEventListener('click', () => $('fileInput').click());
 dropZone.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); } });
