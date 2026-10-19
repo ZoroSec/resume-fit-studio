@@ -8,3 +8,9 @@
   .resume-content h1,.resume-content h2,.resume-content h3{break-after:avoid-page}
   .resume-content li{break-inside:avoid-page}
 }
+.page-previews{height:0}
+.paper-preview{position:absolute;left:0;pointer-events:none}
+.page-copy{overflow:hidden!important;pointer-events:none}
+.page-preview-label,.page-preview-limit{position:absolute;left:0;font:700 11px 'DM Sans',Arial,sans-serif;color:#526b58;letter-spacing:.02em}
+.page-preview-limit{font-weight:500}
+@media print{.page-previews{display:none!important}}

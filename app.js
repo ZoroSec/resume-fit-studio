@@ -75,12 +75,64 @@ function fitMetrics() {
   const linePixels = parseFloat(getComputedStyle(editor).lineHeight) || 16;
   return { available, used, pages, fits, overflowLines: Math.max(0, Math.ceil((used - available - 2) / linePixels)) };
 }
-function checkFit() {
+function renderPagePreviews(pages, available) {
+  const previews = $('pagePreviews');
+  previews.replaceChildren();
+  const [width, height] = pageSizes[settings.paperSize];
+  const scaledHeight = height * 96 / 25.4 * settings.zoom;
+  const gap = 42;
+  const shownPages = Math.min(pages, 12);
+  $('paperWrap').style.height = `${shownPages * scaledHeight + (shownPages - 1) * gap + (pages > shownPages ? 34 : 0)}px`;
+  if (pages === 1) return;
+
+  const fragment = document.createDocumentFragment();
+  for (let index = 1; index < shownPages; index++) {
+    const top = index * (scaledHeight + gap);
+    const label = document.createElement('div');
+    label.className = 'page-preview-label';
+    label.style.top = `${top - 27}px`;
+    label.textContent = `Page ${index + 1} · preview only`;
+
+    const nextPaper = document.createElement('div');
+    nextPaper.className = 'paper paper-preview';
+    nextPaper.style.cssText = `top:${top}px;width:${width}mm;height:${height}mm;transform:scale(${settings.zoom})`;
+    const copy = document.createElement('div');
+    copy.className = 'resume-content page-copy';
+    copy.style.fontFamily = settings.fontFamily;
+    copy.style.fontSize = `${settings.fontSize}pt`;
+    copy.style.lineHeight = settings.lineHeight;
+    copy.style.setProperty('--paragraph-gap', `${settings.paragraphGap}pt`);
+    for (const edge of ['left', 'right', 'top', 'bottom']) copy.style[edge] = `${settings[edge]}mm`;
+    const flow = document.createElement('div');
+    flow.className = 'page-copy-flow';
+    flow.style.transform = `translateY(-${index * available}px)`;
+    flow.innerHTML = editor.innerHTML;
+    for (const element of flow.querySelectorAll('[id], [contenteditable]')) {
+      element.removeAttribute('id');
+      element.removeAttribute('contenteditable');
+    }
+    copy.append(flow);
+    nextPaper.append(copy);
+    fragment.append(label, nextPaper);
+  }
+  if (pages > shownPages) {
+    const note = document.createElement('div');
+    note.className = 'page-preview-limit';
+    note.style.top = `${shownPages * scaledHeight + (shownPages - 1) * gap + 8}px`;
+    note.textContent = `Showing the first ${shownPages} of about ${pages} pages`;
+    fragment.append(note);
+  }
+  previews.append(fragment);
+}
+function checkFit(renderPreview = true) {
+  editor.style.overflowY = 'auto';
   const { available, used, pages, fits, overflowLines } = fitMetrics();
   $('pageStatus').textContent = fits ? settings.fontSize < 10 ? '1 page · small text' : 'Fits on one page' : `~${pages} pages · ~${overflowLines} lines over`;
   $('pageBadge').classList.toggle('overflow', !fits);
   $('pageBadge').classList.toggle('small-text', fits && settings.fontSize < 10);
   $('fitDetail').textContent = `${settings.paperSize === 'a4' ? 'A4' : 'US Letter'} · ${fits ? '1 page' : `~${pages} pages`} · ${fits ? `${Math.round(used / Math.max(available, 1) * 100)}% filled` : `~${overflowLines} lines over`} · ${valueLabel('fontSize')}`;
+  if (!comparison) $('stageHint').textContent = fits ? '✎ Click anywhere on the page to edit your text' : '✎ Scroll inside page 1 to edit overflow; continuation previews appear below';
+  if (renderPreview) renderPagePreviews(pages, available);
   return fits;
 }
 function scheduleFitCheck() { clearTimeout(updateTimer); updateTimer = setTimeout(checkFit, 60); }
@@ -161,13 +213,14 @@ $('fitBtn').addEventListener('click', () => {
       if (key === 'margin') for (const edge of ['left', 'right', 'top', 'bottom']) settings[edge] = Math.max(minimum, Math.min(start[edge], value));
       else settings[key] = Math.round(value * 100) / 100;
       applySettings();
-      if (checkFit()) { fits = true; break; }
+      if (checkFit(false)) { fits = true; break; }
     }
     if (fits) break;
   }
   const changes = fitChanges(start, settings);
   if (changes.length) { fitUndo = start; $('undoFitBtn').disabled = false; }
   syncControls();
+  checkFit();
   const { overflowLines } = fitMetrics();
   $('fitReport').textContent = `${changes.length ? `Changed: ${changes.join('; ')}. ` : 'No safe adjustments remain. '}${fits ? 'Fits on one page.' : `Still ~${overflowLines} lines over. Shorten the text or export a multi-page PDF.`}`;
   showMessage(fits ? 'Fitted to one readable page. Review the changes below.' : 'A readable one-page fit is not possible with these settings. Shorten text or export a multi-page PDF.', fits);
