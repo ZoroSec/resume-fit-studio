@@ -38,13 +38,16 @@ function createResumeDocx(root, settings) {
     }
     return xml;
   }
-  function paragraph(node, kind = 'p', prefix = '') {
+  function paragraph(node, kind = 'p', prefix = '', lastInList = false) {
     const heading = kind === 'h1' || kind === 'h2' || kind === 'h3';
-    const after = kind === 'h1' ? Math.round(gap / 2) : kind === 'h2' ? gap : gap;
+    const after = kind === 'h1' ? Math.round(settings.fontSize * 2.1 * .15 * 20)
+      : kind === 'h3' || kind === 'li' && !lastInList ? Math.round(settings.fontSize * .1 * 20)
+      : kind === 'li' ? Math.round(settings.fontSize * .6 * 20) : gap;
     const before = kind === 'h2' ? gap * 2 : kind === 'h3' ? gap : 0;
-    const indent = kind === 'li' ? '<w:ind w:left="360" w:hanging="180"/>' : '';
+    const indent = kind === 'li' ? '<w:ind w:left="300" w:hanging="120"/>' : '';
     const border = kind === 'h2' ? '<w:pBdr><w:bottom w:val="single" w:sz="4" w:color="A8B5AE"/></w:pBdr>' : '';
-    const pPr = `<w:pPr>${heading ? '<w:keepNext/>' : ''}<w:spacing w:before="${before}" w:after="${after}" w:line="${line}" w:lineRule="auto"/>${indent}${border}</w:pPr>`;
+    const paragraphLine = kind === 'h1' ? Math.round(1.05 * 240) : heading ? Math.round(1.2 * 240) : line;
+    const pPr = `<w:pPr>${heading ? '<w:keepNext/>' : ''}<w:spacing w:before="${before}" w:after="${after}" w:line="${paragraphLine}" w:lineRule="auto"/>${indent}${border}</w:pPr>`;
     const format = kind === 'h1' ? { bold: true, size: Math.round(size * 2.1) } : kind === 'h2' ? { bold: true, size: Math.round(size * 1.04), uppercase: true } : kind === 'h3' ? { bold: true } : {};
     return `<w:p>${pPr}${prefix ? run(prefix) : ''}${inlines(node, format)}</w:p>`;
   }
@@ -66,8 +69,9 @@ function createResumeDocx(root, settings) {
     if (node.nodeType !== 1) continue;
     const tag = node.tagName.toLowerCase();
     if (tag === 'ul' || tag === 'ol') {
-      [...node.children].filter(child => child.tagName === 'LI').forEach((item, index) => {
-        body += paragraph(item, 'li', tag === 'ol' ? `${index + 1}. ` : '• ');
+      const items = [...node.children].filter(child => child.tagName === 'LI');
+      items.forEach((item, index) => {
+        body += paragraph(item, 'li', tag === 'ol' ? `${index + 1}. ` : '• ', index === items.length - 1);
       });
     } else if (tag === 'table') body += table(node);
     else if (tag === 'hr') body += '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4"/></w:pBdr></w:pPr></w:p>';
